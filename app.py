@@ -32,6 +32,7 @@ def connect_to_sheet():
     except Exception as e:
         st.error(f"❌ Error connecting to Google Sheets: {e}")
         return None
+
 def read_users(sheet):
     """Read users and passwords from Users sheet."""
     try:
@@ -230,8 +231,7 @@ def main():
                 else:
                     st.session_state.logged_in_user = selected_user
                     st.rerun()
-    return
-    
+        return
     
     username = st.session_state.logged_in_user
     
