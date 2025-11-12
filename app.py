@@ -206,30 +206,30 @@ def main():
     
     if not st.session_state.logged_in_user:
         sheet = connect_to_sheet()
-    if not sheet:
-        st.error("❌ Cannot connect to Google Sheets")
-        return
-    
-    users = read_users(sheet)
-    
-    st.subheader("🔐 Login")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        selected_user = st.selectbox("Select your name:", [""] + ALL_MEMBERS)
-        password_input = st.text_input("Password:", type="password")
+        if not sheet:
+            st.error("❌ Cannot connect to Google Sheets")
+            return
         
-        if st.button("Login", type="primary"):
-            if not selected_user:
-                st.error("Please select your name")
-            elif not password_input:
-                st.error("Please enter password")
-            elif selected_user not in users:
-                st.error("User not found")
-            elif password_input != users[selected_user]:
-                st.error("❌ Incorrect password")
-            else:
-                st.session_state.logged_in_user = selected_user
-                st.rerun()
+        users = read_users(sheet)
+        
+        st.subheader("🔐 Login")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_user = st.selectbox("Select your name:", [""] + ALL_MEMBERS)
+            password_input = st.text_input("Password:", type="password")
+            
+            if st.button("Login", type="primary"):
+                if not selected_user:
+                    st.error("Please select your name")
+                elif not password_input:
+                    st.error("Please enter password")
+                elif selected_user not in users:
+                    st.error("User not found")
+                elif password_input != users[selected_user]:
+                    st.error("❌ Incorrect password")
+                else:
+                    st.session_state.logged_in_user = selected_user
+                    st.rerun()
     return
     
     
