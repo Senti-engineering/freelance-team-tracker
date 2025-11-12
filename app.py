@@ -205,7 +205,7 @@ def main():
         st.session_state.logged_in_user = None
     
     if not st.session_state.logged_in_user:
-    sheet = connect_to_sheet()
+        sheet = connect_to_sheet()
     if not sheet:
         st.error("❌ Cannot connect to Google Sheets")
         return
