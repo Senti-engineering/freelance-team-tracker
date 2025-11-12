@@ -115,51 +115,39 @@ def get_user_projects(projects, username):
             user_projects.append(project["Project Name"])
     return user_projects
 
-def calculate_project_finances(project_name, expenses, reimbursements, profit_splits, project_budget):
+def calculate_project_finances(project_name, expenses, reimbursements, profit_splits, project_budget, team_members):
     """Calculate financial breakdown for a project."""
     project_expenses = [e for e in expenses if e.get("Project") == project_name]
     project_reimbursements = [r for r in reimbursements if r.get("Project") == project_name]
     project_splits = [s for s in profit_splits if s.get("Project") == project_name]
     
-    # Get team members from the project
     total_expenses = sum(float(e.get("Amount", 0)) for e in project_expenses)
     total_reimbursed = sum(float(r.get("Amount", 0)) for r in project_reimbursements)
     profit = project_budget - total_expenses
     
     member_data = {}
     
-    # Initialize ALL team members first (so everyone shows up)
-    all_members = set()
-    for expense in project_expenses:
-        all_members.add(expense.get("Paid By"))
-    for reimb in project_reimbursements:
-        all_members.add(reimb.get("To"))
-        all_members.add(reimb.get("From"))
-    for split in project_splits:
-        all_members.add(split.get("Member"))
-    
-    # Initialize all members with zero values
-    for member in all_members:
-        if member:  # Skip None/empty values
-            member_data[member] = {"expenses_paid": 0, "reimbursed": 0, "profit_share": 0, "profit_percentage": 0}
+    # Initialize ALL team members from the project first
+    for member in team_members:
+        member_data[member] = {"expenses_paid": 0, "reimbursed": 0, "profit_share": 0, "profit_percentage": 0}
     
     for expense in project_expenses:
         paid_by = expense.get("Paid By")
         amount = float(expense.get("Amount", 0))
-        if paid_by and paid_by in member_data:
+        if paid_by in member_data:
             member_data[paid_by]["expenses_paid"] += amount
     
     for reimb in project_reimbursements:
         to_person = reimb.get("To")
         amount = float(reimb.get("Amount", 0))
-        if to_person and to_person in member_data:
+        if to_person in member_data:
             member_data[to_person]["reimbursed"] += amount
     
     for split in project_splits:
         member = split.get("Member")
         percentage = float(split.get("Percentage", 0))
         profit_amount = (percentage / 100) * profit
-        if member and member in member_data:
+        if member in member_data:
             member_data[member]["profit_share"] = profit_amount
             member_data[member]["profit_percentage"] = percentage
     
@@ -289,7 +277,8 @@ def main():
         expenses, 
         reimbursements, 
         profit_splits,
-        project_budget
+        project_budget,
+        team_members
     )
     
     tab1, tab2, tab3, tab4 = st.tabs([
