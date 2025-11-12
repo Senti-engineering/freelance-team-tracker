@@ -470,7 +470,7 @@ def main():
             })
             reimb_df = reimb_df[['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes']]
         else:
-            reimb_df = pd.DataFrame(columns=['Date',            reimb_df = pd.DataFrame(columns=['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes'])
+            reimb_df = pd.DataFrame(columns=['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes'])
         
         # Combine all transactions
         if not expenses_df.empty or not reimb_df.empty:
