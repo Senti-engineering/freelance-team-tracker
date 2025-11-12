@@ -281,11 +281,16 @@ def main():
         team_members
     )
     
-    tab1, tab2, tab3, tab4 = st.tabs([
+    # Filter project transactions
+    project_expenses = [e for e in expenses if e.get("Project") == selected_project_name]
+    project_reimbursements = [r for r in reimbursements if r.get("Project") == selected_project_name]
+    
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Dashboard", 
         "💰 Add Expense", 
-        "💸 Add Reimbursement",
-        "📈 Set Profit Split"
+        "💸 Money Flow",
+        "📈 Set Profit Split",
+        "📋 Transaction History"
     ])
     
     with tab1:
@@ -315,7 +320,7 @@ def main():
                         with col1:
                             st.metric("Expenses Paid", f"{data['expenses_paid']:,.2f} {CURRENCY}")
                         with col2:
-                            st.metric("Reimbursed", f"{data['reimbursed']:,.2f} {CURRENCY}")
+                            st.metric("Money Received", f"{data['reimbursed']:,.2f} {CURRENCY}")
                         with col3:
                             st.metric("Profit Share", f"{data['profit_share']:,.2f} {CURRENCY}")
                             st.caption(f"{data['profit_percentage']:.1f}%")
@@ -328,7 +333,7 @@ def main():
                             elif balance < -0.01:
                                 st.markdown(f"**Final Balance:**")
                                 st.markdown(f'<p class="balance-negative">{balance:,.2f} {CURRENCY}</p>', unsafe_allow_html=True)
-                                st.caption("To Pay")
+                                st.caption("Holding Project Money")
                             else:
                                 st.markdown(f"**Final Balance:**")
                                 st.markdown(f'<p class="balance-zero">0.00 {CURRENCY}</p>', unsafe_allow_html=True)
@@ -367,32 +372,36 @@ def main():
                         st.rerun()
     
     with tab3:
-        st.subheader("💸 Record Reimbursement")
+        st.subheader("💸 Track Money Flow")
+        st.info("💡 Record client payments OR money transfers between team members")
         
         with st.form("reimbursement_form"):
             col1, col2 = st.columns(2)
             
             with col1:
                 reimb_date = st.date_input("Date", datetime.now())
-                reimb_from = st.selectbox("From (Payer)", team_members)
+                reimb_from = st.selectbox("From (Source)", ["Client"] + team_members)
                 reimb_to = st.selectbox("To (Recipient)", team_members)
             
             with col2:
                 reimb_amount = st.number_input(f"Amount ({CURRENCY})", min_value=0.0, step=0.01)
-                reimb_notes = st.text_area("Notes (optional)")
+                reimb_notes = st.text_area("Notes (optional)", placeholder="e.g., Client installment, Payback for materials")
             
-            submit = st.form_submit_button("💾 Record Reimbursement")
+            submit = st.form_submit_button("💾 Record Payment")
             
             if submit:
                 if reimb_from == reimb_to:
-                    st.error("Payer and recipient must be different")
+                    st.error("Source and recipient must be different")
                 elif reimb_amount <= 0:
                     st.error("Amount must be positive")
                 else:
                     date_str = reimb_date.strftime("%Y-%m-%d")
                     if add_reimbursement(sheet, date_str, selected_project_name, reimb_from,
                                         reimb_to, reimb_amount, reimb_notes):
-                        st.success(f"✅ Reimbursement recorded!")
+                        if reimb_from == "Client":
+                            st.success(f"✅ Client payment recorded! {reimb_to} received {reimb_amount:,.2f} {CURRENCY}")
+                        else:
+                            st.success(f"✅ Payment recorded! {reimb_from} → {reimb_to}: {reimb_amount:,.2f} {CURRENCY}")
                         st.rerun()
     
     with tab4:
@@ -429,6 +438,81 @@ def main():
                     if add_profit_split(sheet, selected_project_name, split_member, split_percentage, split_notes):
                         st.success(f"✅ Profit split updated: {split_member} = {split_percentage}%")
                         st.rerun()
+    
+    with tab5:
+        st.subheader("📋 Transaction History")
+        
+        # Create expenses dataframe
+        if project_expenses:
+            expenses_df = pd.DataFrame(project_expenses)
+            expenses_df['Type'] = '💰 Expense'
+            expenses_df = expenses_df.rename(columns={
+                'Date': 'Date',
+                'Paid By': 'Person',
+                'Description': 'Description',
+                'Amount': 'Amount',
+                'Notes': 'Notes'
+            })
+            expenses_df = expenses_df[['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes']]
+        else:
+            expenses_df = pd.DataFrame(columns=['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes'])
+        
+        # Create reimbursements dataframe
+        if project_reimbursements:
+            reimb_df = pd.DataFrame(project_reimbursements)
+            reimb_df['Type'] = '💸 Payment'
+            reimb_df['Description'] = reimb_df['From'] + ' → ' + reimb_df['To']
+            reimb_df['Person'] = reimb_df['To']
+            reimb_df = reimb_df.rename(columns={
+                'Date': 'Date',
+                'Amount': 'Amount',
+                'Notes': 'Notes'
+            })
+            reimb_df = reimb_df[['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes']]
+        else:
+            reimb_df = pd.DataFrame(columns=['Date',            reimb_df = pd.DataFrame(columns=['Date', 'Type', 'Person', 'Description', 'Amount', 'Notes'])
+        
+        # Combine all transactions
+        if not expenses_df.empty or not reimb_df.empty:
+            all_transactions = pd.concat([expenses_df, reimb_df], ignore_index=True)
+            all_transactions = all_transactions.sort_values('Date', ascending=False)
+            
+            # Display filters
+            col1, col2 = st.columns(2)
+            with col1:
+                filter_type = st.multiselect("Filter by Type:", ['💰 Expense', '💸 Payment'], default=['💰 Expense', '💸 Payment'])
+            with col2:
+                filter_person = st.multiselect("Filter by Person:", team_members, default=team_members)
+            
+            # Apply filters
+            filtered_df = all_transactions[
+                (all_transactions['Type'].isin(filter_type)) &
+                (all_transactions['Person'].isin(filter_person))
+            ]
+            
+            if not filtered_df.empty:
+                st.dataframe(
+                    filtered_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Summary stats
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    total_expense_transactions = len(filtered_df[filtered_df['Type'] == '💰 Expense'])
+                    st.metric("Total Expenses", total_expense_transactions)
+                with col2:
+                    total_payment_transactions = len(filtered_df[filtered_df['Type'] == '💸 Payment'])
+                    st.metric("Total Payments", total_payment_transactions)
+                with col3:
+                    total_amount = filtered_df['Amount'].sum()
+                    st.metric("Total Amount", f"{total_amount:,.2f} {CURRENCY}")
+            else:
+                st.info("No transactions match the selected filters")
+        else:
+            st.info("📭 No transactions recorded yet for this project")
 
 if __name__ == "__main__":
     main()
