@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+import hashlib
 
 # ============================================================================
 # CONFIGURATION
@@ -31,7 +32,16 @@ def connect_to_sheet():
     except Exception as e:
         st.error(f"❌ Error connecting to Google Sheets: {e}")
         return None
-
+def read_users(sheet):
+    """Read users and passwords from Users sheet."""
+    try:
+        worksheet = sheet.worksheet("Users")
+        data = worksheet.get_all_records()
+        return {user['Username']: user['Password'] for user in data}
+    except Exception as e:
+        st.error(f"Error reading users: {e}")
+        return {}
+        
 def read_projects(sheet):
     try:
         worksheet = sheet.worksheet("Projects")
@@ -195,17 +205,33 @@ def main():
         st.session_state.logged_in_user = None
     
     if not st.session_state.logged_in_user:
-        st.subheader("🔐 Login")
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            selected_user = st.selectbox("Select your name:", [""] + ALL_MEMBERS)
-            if st.button("Login", type="primary"):
-                if selected_user:
-                    st.session_state.logged_in_user = selected_user
-                    st.rerun()
-                else:
-                    st.error("Please select your name")
+    sheet = connect_to_sheet()
+    if not sheet:
+        st.error("❌ Cannot connect to Google Sheets")
         return
+    
+    users = read_users(sheet)
+    
+    st.subheader("🔐 Login")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        selected_user = st.selectbox("Select your name:", [""] + ALL_MEMBERS)
+        password_input = st.text_input("Password:", type="password")
+        
+        if st.button("Login", type="primary"):
+            if not selected_user:
+                st.error("Please select your name")
+            elif not password_input:
+                st.error("Please enter password")
+            elif selected_user not in users:
+                st.error("User not found")
+            elif password_input != users[selected_user]:
+                st.error("❌ Incorrect password")
+            else:
+                st.session_state.logged_in_user = selected_user
+                st.rerun()
+    return
+    
     
     username = st.session_state.logged_in_user
     
